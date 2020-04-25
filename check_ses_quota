@@ -1,0 +1,41 @@
+#!/bin/bash
+#-------------------------------------------------------------------
+# Author: Vikash Kumar
+# Description: To check if the mail sent from SES is above some threshold
+# Version: 1.0
+
+#-------------------------------------------------------------------
+# PREQUISTES
+#-------------------------------------------------------------------
+# You need to first configure the AWS CLI before executing this script
+#-------------------------------------------------------------------
+# TODO - write a logger for this
+#-------------------------------------------------------------------
+# VARIABLES
+#-------------------------------------------------------------------
+THRESHOLD_VAL=60
+AWS_REGION=us-east-1
+LOGFILE_PATH=/var/log/check_SES_quota.log
+DATE_TIME=$(date +"%d/%m/%Y %H:%M")
+#-------------------------------------------------------------------
+MAX_24_HOUR_LIMIT=$(aws ses get-send-quota --region $AWS_REGION |grep Max24HourSend | awk '{print $2}' | awk -F'.' '{print $1}' )
+SENT_LAST_24_HOURS=$(aws ses get-send-quota --region $AWS_REGION | grep SentLast24Hours | awk '{print $2}'| awk -F'.' '{print $1}')
+
+echo "$DATE_TIME INFO: Maximum 24 Hour SES Limit is = $MAX_24_HOUR_LIMIT" >> $LOGFILE_PATH
+echo "$DATE_TIME INFO: Number of Mails sent through SES in Last 24 hour is = $SENT_LAST_24_HOURS" >> $LOGFILE_PATH
+
+# Getting total percentage of SES quota used
+
+SENT_MAIL_PERCENTAGE=$((SENT_LAST_24_HOURS*100/MAX_24_HOUR_LIMIT))
+echo "$DATE_TIME INFO: Sent Mail Percentage is = $SENT_MAIL_PERCENTAGE" >> $LOGFILE_PATH
+
+# Checking if we have used the threshold value of our total quota of sending mails from SES
+if [[ "$SENT_MAIL_PERCENTAGE" -gt "$THRESHOLD_VAL" ]]
+    then
+        echo "$DATE_TIME ERROR: SES Quota About to Reach, Please check SES Reputation Dashboard for more details" >> $LOGFILE_PATH
+        echo -e "$THRESHOLD_VAL % of the total quota $MAX_24_HOUR_LIMIT is already used."| mailx  -s "SES Sent Quota Threshold Reached" -r "<from_email_id@somedomain.com>" "<mail_to_whome@youWantToSend.com"
+        echo $?
+    else
+        echo "$DATE_TIME INFO: No issues so far" >> $LOGFILE_PATH
+fi
+
